@@ -1,15 +1,15 @@
-CPP = g++ -Wall 
+CPP = g++ -Wall -pg -Ofast -march=native -flto -fno-fat-lto-objects -funroll-loops -ffast-math -fprefetch-loop-arrays
 SRCS = main.cpp fluid_solver.cpp EventManager.cpp
+TARGET = fluid_sim
 
-# Alvo principal: Compilar com suporte ao gprof
-all: fluid_sim
+all: $(TARGET)
 
-# Compilar o programa com suporte ao profiling (flag -pg)
-fluid_sim: $(SRCS)
-	$(CPP) -pg $(SRCS) -o fluid_sim
+$(TARGET): $(SRCS)
+	$(CPP) $(SRCS) -o $(TARGET)
 
-# Limpar arquivos gerados
 clean:
 	@echo Cleaning up...
-	@rm -f fluid_sim gmon.out
+	@rm -f $(TARGET)
 	@echo Done.
+
+.PHONY: all clean
