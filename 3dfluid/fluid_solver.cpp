@@ -54,56 +54,53 @@ void set_bnd(int M, int N, int O, int b, float *x) {
 }
 
 // Linear solve for implicit methods (diffusion)
-void lin_solve(int M, int N, int O, int b, float *fluids, float *fluids0, float a,
-               float c) {
-  float cRecip = 1.0 / c;
+#define BLOCK_SIZE_Z 8
+#define BLOCK_SIZE_Y 8
+#define BLOCK_SIZE_X 8
 
-  int ix, ix_prior_k, ix_prior_j, ix_next_j, ix_next_k;
-  int base_k, prior_base_k, next_base_k;
-  int base_j, prior_base_j, next_base_j;
+void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
+    const float cRecip = 1.0f / c;
+    
+    for (int l = 0; l < LINEARSOLVERTIMES; l++) {
+        for (int k_block = 1; k_block <= O; k_block += BLOCK_SIZE_Z) {
+            for (int j_block = 1; j_block <= N; j_block += BLOCK_SIZE_Y) {
+                for (int i_block = 1; i_block <= M; i_block += BLOCK_SIZE_X) {
+                    int k_end = (k_block + BLOCK_SIZE_Z - 1 > O) ? O : k_block + BLOCK_SIZE_Z - 1;
+                    int j_end = (j_block + BLOCK_SIZE_Y - 1 > N) ? N : j_block + BLOCK_SIZE_Y - 1;
+                    int i_end = (i_block + BLOCK_SIZE_X - 1 > M) ? M : i_block + BLOCK_SIZE_X - 1;
 
-  int block_size_z = 2, block_size_y = 2, block_size_x = 2;
+                    for (int k = k_block; k <= k_end; k++) {
+                        int base_k = k * (N + 2) * (M + 2);
+                        int prior_base_k = (k - 1) * (N + 2) * (M + 2);
+                        int next_base_k = (k + 1) * (N + 2) * (M + 2);
 
-  for (int l = 0; l < LINEARSOLVERTIMES; l++) {
-    // Loop over blocks in the k (z-axis) direction
-    for (int k_block = 1; k_block <= O; k_block += block_size_z) {
-      // Loop over blocks in the j (y-axis) direction
-      for (int j_block = 1; j_block <= N; j_block += block_size_y) {
-        // Loop over blocks in the i (x-axis) direction
-        for (int i_block = 1; i_block <= M; i_block += block_size_x) {
-          // Process elements within the current block
-          for (int k = k_block; k < k_block + block_size_z && k <= O; k++) {
-            base_k = k * (N + 2) * (M + 2);
-            prior_base_k = (k - 1) * (N + 2) * (M + 2);
-            next_base_k = (k + 1) * (N + 2) * (M + 2);
+                        for (int j = j_block; j <= j_end; j++) {
+                            int base_j = j * (M + 2);
+                            int prior_base_j = (j - 1) * (M + 2);
+                            int next_base_j = (j + 1) * (M + 2);
 
-            for (int j = j_block; j < j_block + block_size_y && j <= N; j++) {
-              base_j = j * (M + 2);
-              prior_base_j = (j - 1) * (M + 2);
-              next_base_j = (j + 1) * (M + 2);
+                            for (int i = i_block; i <= i_end; i += 4) {
+                                int ix = base_k + base_j + i;
+                                int ix_prior_k = prior_base_k + base_j + i;
+                                int ix_next_k = next_base_k + base_j + i;
+                                int ix_prior_j = base_k + prior_base_j + i;
+                                int ix_next_j = base_k + next_base_j + i;
 
-              for (int i = i_block; i < i_block + block_size_x && i <= M; i++) {
-                ix = base_k + base_j + i;
-
-                ix_prior_k = prior_base_k + base_j + i;
-                ix_next_k = next_base_k + base_j + i;
-
-                ix_prior_j = base_k + prior_base_j + i;
-                ix_next_j = base_k + next_base_j + i;
-
-                fluids[ix] = (fluids0[ix] +
-                              a * (fluids[ix-1] + fluids[ix+1] +
-                                   fluids[ix_prior_j] + fluids[ix_next_j] +
-                                   fluids[ix_prior_k] + fluids[ix_next_k])) *
-                             cRecip;
-              }
+                                // Manual loop unrolling for 4 elements
+                                for (int u = 0; u < 4 && i + u <= i_end; u++) {
+                                    x[ix + u] = (x0[ix + u] +
+                                                 a * (x[ix + u - 1] + x[ix + u + 1] +
+                                                      x[ix_prior_j + u] + x[ix_next_j + u] +
+                                                      x[ix_prior_k + u] + x[ix_next_k + u])) * cRecip;
+                                }
+                            }
+                        }
+                    }
+                }
             }
-          }
         }
-      }
+        set_bnd(M, N, O, b, x);
     }
-    set_bnd(M, N, O, b, fluids);
-  }
 }
 
 // Diffusion step (uses implicit method)
