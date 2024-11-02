@@ -11,6 +11,7 @@
   }
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define LINEARSOLVERTIMES 20
+#define numthreads 4
 
 // Add sources (density or velocity)
 void add_source(int M, int N, int O, float *x, float *s, float dt) {
@@ -62,43 +63,53 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
 
     do {
         max_c = 0.0f;
-        
-        // Paraleliza o primeiro loop para (i + j) % 2 == 1
-        #pragma omp parallel for private(old_x, change) reduction(max : max_c)
-        for (int i = 1; i <= M; i++) {
-            for (int j = 1; j <= N; j++) {
-                 for (int k = 1 + (i + j) % 2; k <= O; k += 2) {
-                    int idx = IX(i, j, k);
-                    old_x = x[idx];
-                    x[idx] = (x0[idx] +
-                              a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                   x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                   x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
-                    change = fabs(x[idx] - old_x);
-                    if (change > max_c) max_c = change;
+
+        // Criar uma região paralela e distribuir o loop
+        #pragma omp parallel num_threads(numthreads)
+        {
+            float local_max_c = 0.0f;  // Variável local para evitar contenção
+
+            // Loop paralelo para os índices onde (i + j + k) % 2 == 1
+            #pragma omp for
+            for (int i = 1; i <= M; i++) {
+                for (int j = 1; j <= N; j++) {
+                    for (int k = 1 + (i + j) % 2; k <= O; k += 2) {
+                        int idx = IX(i, j, k);
+                        old_x = x[idx];
+                        x[idx] = (x0[idx] +
+                                  a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
+                                       x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
+                                       x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
+                        change = fabs(x[idx] - old_x);
+                        if (change > local_max_c) local_max_c = change;
+                    }
                 }
             }
-        }
+            if (local_max_c > max_c) max_c = local_max_c;
 
-        // Paraleliza o segundo loop para (i + j) % 2 == 0
-        #pragma omp parallel for private(old_x, change) reduction(max : max_c)
-        for (int i = 1; i <= M; i++) {
-            for (int j = 1; j <= N; j++) {
-                for (int k = 1 + (i + j + 1) % 2; k <= O; k += 2) {
-                    int idx = IX(i, j, k);
-                    old_x = x[idx];
-                    x[idx] = (x0[idx] +
-                              a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                   x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                   x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
-                    change = fabs(x[idx] - old_x);
-                    if (change > max_c) max_c = change;
+            // Loop paralelo para os índices onde (i + j + k) % 2 == 0
+            #pragma omp for
+            for (int i = 1; i <= M; i++) {
+                for (int j = 1; j <= N; j++) {
+                    for (int k = 1 + (i + j + 1) % 2; k <= O; k += 2) {
+                        int idx = IX(i, j, k);
+                        old_x = x[idx];
+                        x[idx] = (x0[idx] +
+                                  a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
+                                       x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
+                                       x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
+                        change = fabs(x[idx] - old_x);
+                        if (change > local_max_c) local_max_c = change;
+                    }
                 }
             }
+            if (local_max_c > max_c) max_c = local_max_c;
         }
 
+        // Define as condições de contorno
         set_bnd(M, N, O, b, x);
-    } while (max_c > tol && ++l < 20);
+        l++;
+    } while (max_c > tol && l < LINEARSOLVERTIMES);
 }
 
 // Diffusion step (uses implicit method)
