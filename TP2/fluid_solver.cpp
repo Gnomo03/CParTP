@@ -1,7 +1,5 @@
 #include "fluid_solver.h"
 #include <cmath>
-#include <omp.h>
-#include <algorithm>
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 #define SWAP(x0, x)                                                            \
@@ -54,6 +52,13 @@ void set_bnd(int M, int N, int O, int b, float *x) {
   x[IX(M + 1, N + 1, 0)] = 0.33f * (x[IX(M, N + 1, 0)] + x[IX(M + 1, N, 0)] +
                                     x[IX(M + 1, N + 1, 1)]);
 }
+
+// red-black solver with convergence check
+#include <omp.h>
+#include <cmath>
+#include <algorithm>
+
+#define IX(i,j,k) ((i) * (N + 2) * (O + 2) + (j) * (O + 2) + (k))
 
 void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
     float tol = 1e-7;
