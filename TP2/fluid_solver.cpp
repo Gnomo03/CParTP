@@ -1,6 +1,7 @@
 #include "fluid_solver.h"
 #include <cmath>
 #include <omp.h>
+#include <algorithm>
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 #define SWAP(x0, x)                                                            \
@@ -11,7 +12,6 @@
   }
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define LINEARSOLVERTIMES 20
-#define numthreads 4
 
 // Add sources (density or velocity)
 void add_source(int M, int N, int O, float *x, float *s, float dt) {
@@ -55,63 +55,52 @@ void set_bnd(int M, int N, int O, int b, float *x) {
                                     x[IX(M + 1, N + 1, 1)]);
 }
 
-// red-black solver with convergence check
 void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
-    float tol = 1e-7, max_c, old_x, change;
+    float tol = 1e-7;
+    float max_c;
     int l = 0;
-    float cInverse = 1.0f / c;
-
+    
     do {
         max_c = 0.0f;
-
-        // Criar uma região paralela e distribuir o loop
-        #pragma omp parallel num_threads(numthreads)
-        {
-            float local_max_c = 0.0f;  // Variável local para evitar contenção
-
-            // Loop paralelo para os índices onde (i + j + k) % 2 == 1
-            #pragma omp for
-            for (int i = 1; i <= M; i++) {
-                for (int j = 1; j <= N; j++) {
-                    for (int k = 1 + (i + j) % 2; k <= O; k += 2) {
-                        int idx = IX(i, j, k);
-                        old_x = x[idx];
-                        x[idx] = (x0[idx] +
-                                  a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                       x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                       x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
-                        change = fabs(x[idx] - old_x);
-                        if (change > local_max_c) local_max_c = change;
-                    }
+        
+        // Red cells update
+        #pragma omp parallel for reduction(max:max_c) collapse(2) schedule(guided)
+        for (int i = 1; i <= M; i++) {
+            for (int j = 1; j <= N; j++) {
+                for (int k = 1 + (i+j)%2; k <= O; k+=2) {
+                    const int idx = IX(i,j,k);
+                    const float old_x = x[idx];
+                    x[idx] = (x0[idx] +
+                              a * (x[IX(i-1,j,k)] + x[IX(i+1,j,k)] +
+                                   x[IX(i,j-1,k)] + x[IX(i,j+1,k)] +
+                                   x[IX(i,j,k-1)] + x[IX(i,j,k+1)])) / c;
+                    max_c = std::max(max_c, std::fabs(x[idx] - old_x));
                 }
             }
-            if (local_max_c > max_c) max_c = local_max_c;
-
-            // Loop paralelo para os índices onde (i + j + k) % 2 == 0
-            #pragma omp for
-            for (int i = 1; i <= M; i++) {
-                for (int j = 1; j <= N; j++) {
-                    for (int k = 1 + (i + j + 1) % 2; k <= O; k += 2) {
-                        int idx = IX(i, j, k);
-                        old_x = x[idx];
-                        x[idx] = (x0[idx] +
-                                  a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                       x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                       x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * cInverse;
-                        change = fabs(x[idx] - old_x);
-                        if (change > local_max_c) local_max_c = change;
-                    }
-                }
-            }
-            if (local_max_c > max_c) max_c = local_max_c;
         }
-
-        // Define as condições de contorno
+        
         set_bnd(M, N, O, b, x);
-        l++;
-    } while (max_c > tol && l < LINEARSOLVERTIMES);
+        
+        // Black cells update
+        #pragma omp parallel for reduction(max:max_c) collapse(2) schedule(guided)
+        for (int i = 1; i <= M; i++) {
+            for (int j = 1; j <= N; j++) {
+                for (int k = 1 + (i+j+1)%2; k <= O; k+=2) {
+                    const int idx = IX(i,j,k);
+                    const float old_x = x[idx];
+                    x[idx] = (x0[idx] +
+                              a * (x[IX(i-1,j,k)] + x[IX(i+1,j,k)] +
+                                   x[IX(i,j-1,k)] + x[IX(i,j+1,k)] +
+                                   x[IX(i,j,k-1)] + x[IX(i,j,k+1)])) / c;
+                    max_c = std::max(max_c, std::fabs(x[idx] - old_x));
+                }
+            }
+        }
+        
+        set_bnd(M, N, O, b, x);
+        
+    } while (max_c > tol && ++l < 20);
 }
-
 // Diffusion step (uses implicit method)
 void diffuse(int M, int N, int O, int b, float *x, float *x0, float diff,
              float dt) {
@@ -121,77 +110,84 @@ void diffuse(int M, int N, int O, int b, float *x, float *x0, float diff,
 }
 
 // Advection step (uses velocity field to move quantities)
-void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v, float *w, float dt) {
-    float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
+void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
+            float *w, float dt) {
+  float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
 
-    #pragma omp parallel for
-    for (int i = 1; i <= M; i++) {
-        for (int j = 1; j <= N; j++) {
-            for (int k = 1; k <= O; k++) {
-                float x = i - dtX * u[IX(i, j, k)];
-                float y = j - dtY * v[IX(i, j, k)];
-                float z = k - dtZ * w[IX(i, j, k)];
+  for (int i = 1; i <= M; i++) {
+    for (int j = 1; j <= N; j++) {
+      for (int k = 1; k <= O; k++) {
+        float x = i - dtX * u[IX(i, j, k)];
+        float y = j - dtY * v[IX(i, j, k)];
+        float z = k - dtZ * w[IX(i, j, k)];
 
-                x = fmax(0.5f, fmin(x, M + 0.5f));
-                y = fmax(0.5f, fmin(y, N + 0.5f));
-                z = fmax(0.5f, fmin(z, O + 0.5f));
+        // Clamp to grid boundaries
+        if (x < 0.5f)
+          x = 0.5f;
+        if (x > M + 0.5f)
+          x = M + 0.5f;
+        if (y < 0.5f)
+          y = 0.5f;
+        if (y > N + 0.5f)
+          y = N + 0.5f;
+        if (z < 0.5f)
+          z = 0.5f;
+        if (z > O + 0.5f)
+          z = O + 0.5f;
 
-                int i0 = (int)x, i1 = i0 + 1;
-                int j0 = (int)y, j1 = j0 + 1;
-                int k0 = (int)z, k1 = k0 + 1;
+        int i0 = (int)x, i1 = i0 + 1;
+        int j0 = (int)y, j1 = j0 + 1;
+        int k0 = (int)z, k1 = k0 + 1;
 
-                float s1 = x - i0, s0 = 1 - s1;
-                float t1 = y - j0, t0 = 1 - t1;
-                float u1 = z - k0, u0 = 1 - u1;
+        float s1 = x - i0, s0 = 1 - s1;
+        float t1 = y - j0, t0 = 1 - t1;
+        float u1 = z - k0, u0 = 1 - u1;
 
-                d[IX(i, j, k)] =
-                    s0 * (t0 * (u0 * d0[IX(i0, j0, k0)] + u1 * d0[IX(i0, j0, k1)]) +
-                          t1 * (u0 * d0[IX(i0, j1, k0)] + u1 * d0[IX(i0, j1, k1)])) +
-                    s1 * (t0 * (u0 * d0[IX(i1, j0, k0)] + u1 * d0[IX(i1, j0, k1)]) +
-                          t1 * (u0 * d0[IX(i1, j1, k0)] + u1 * d0[IX(i1, j1, k1)]));
-            }
-        }
+        d[IX(i, j, k)] =
+            s0 * (t0 * (u0 * d0[IX(i0, j0, k0)] + u1 * d0[IX(i0, j0, k1)]) +
+                  t1 * (u0 * d0[IX(i0, j1, k0)] + u1 * d0[IX(i0, j1, k1)])) +
+            s1 * (t0 * (u0 * d0[IX(i1, j0, k0)] + u1 * d0[IX(i1, j0, k1)]) +
+                  t1 * (u0 * d0[IX(i1, j1, k0)] + u1 * d0[IX(i1, j1, k1)]));
+      }
     }
-    set_bnd(M, N, O, b, d);
+  }
+  set_bnd(M, N, O, b, d);
 }
-
 
 // Projection step to ensure incompressibility (make the velocity field
 // divergence-free)
-void project(int M, int N, int O, float *u, float *v, float *w, float *p, float *div) {
-    #pragma omp parallel for
-    for (int i = 1; i <= M; i++) {
-        for (int j = 1; j <= N; j++) {
-            for (int k = 1; k <= O; k++) {
-                div[IX(i, j, k)] = -0.5f * (
-                    u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] +
-                    v[IX(i, j + 1, k)] - v[IX(i, j - 1, k)] +
-                    w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) / MAX(M, MAX(N, O));
-                p[IX(i, j, k)] = 0;
-            }
-        }
+void project(int M, int N, int O, float *u, float *v, float *w, float *p,
+             float *div) {
+  for (int i = 1; i <= M; i++) {
+    for (int j = 1; j <= N; j++) {
+      for (int k = 1; k <= O; k++) {
+        div[IX(i, j, k)] =
+            -0.5f *
+            (u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] + v[IX(i, j + 1, k)] -
+             v[IX(i, j - 1, k)] + w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) /
+            MAX(M, MAX(N, O));
+        p[IX(i, j, k)] = 0;
+      }
     }
+  }
 
-    set_bnd(M, N, O, 0, div);
-    set_bnd(M, N, O, 0, p);
-    lin_solve(M, N, O, 0, p, div, 1, 6);
+  set_bnd(M, N, O, 0, div);
+  set_bnd(M, N, O, 0, p);
+  lin_solve(M, N, O, 0, p, div, 1, 6);
 
-    #pragma omp parallel for
-    for (int i = 1; i <= M; i++) {
-        for (int j = 1; j <= N; j++) {
-            for (int k = 1; k <= O; k++) {
-                u[IX(i, j, k)] -= 0.5f * (p[IX(i + 1, j, k)] - p[IX(i - 1, j, k)]);
-                v[IX(i, j, k)] -= 0.5f * (p[IX(i, j + 1, k)] - p[IX(i, j - 1, k)]);
-                w[IX(i, j, k)] -= 0.5f * (p[IX(i, j, k + 1)] - p[IX(i, j, k - 1)]);
-            }
-        }
+  for (int i = 1; i <= M; i++) {
+    for (int j = 1; j <= N; j++) {
+      for (int k = 1; k <= O; k++) {
+        u[IX(i, j, k)] -= 0.5f * (p[IX(i + 1, j, k)] - p[IX(i - 1, j, k)]);
+        v[IX(i, j, k)] -= 0.5f * (p[IX(i, j + 1, k)] - p[IX(i, j - 1, k)]);
+        w[IX(i, j, k)] -= 0.5f * (p[IX(i, j, k + 1)] - p[IX(i, j, k - 1)]);
+      }
     }
-
-    set_bnd(M, N, O, 1, u);
-    set_bnd(M, N, O, 2, v);
-    set_bnd(M, N, O, 3, w);
+  }
+  set_bnd(M, N, O, 1, u);
+  set_bnd(M, N, O, 2, v);
+  set_bnd(M, N, O, 3, w);
 }
-
 
 // Step function for density
 void dens_step(int M, int N, int O, float *x, float *x0, float *u, float *v,
