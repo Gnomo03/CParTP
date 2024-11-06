@@ -61,7 +61,6 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
 
     do {
         max_c = 0.0f;
-        // Red phase
         #pragma omp parallel for schedule(static) reduction(max:max_c) private(old_x, change)
         for (int k = 1; k <= O; k++) {
             for (int j = 1; j <= N; j++) {
@@ -70,14 +69,13 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
                     x[IX(i, j, k)] = (x0[IX(i, j, k)] +
                                       a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
+                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /c;
                     change = fabs(x[IX(i, j, k)] - old_x);
-                    if (change > max_c) max_c = change;
+                    if(change > max_c) max_c = change;
                 }
             }
         }
 
-        // Black phase
         #pragma omp parallel for schedule(static) reduction(max:max_c) private(old_x, change)
         for (int k = 1; k <= O; k++) {
             for (int j = 1; j <= N; j++) {
@@ -88,7 +86,7 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
                                            x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
                     change = fabs(x[IX(i, j, k)] - old_x);
-                    if (change > max_c) max_c = change;
+                    if(change > max_c) max_c = change;
                 }
             }
         }
@@ -155,7 +153,6 @@ void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
 // Projection step to ensure incompressibility (make the velocity field
 // divergence-free)
 void project(int M, int N, int O, float *u, float *v, float *w, float *p, float *div) {
-    // Step 1: Compute divergence and initialize pressure
     #pragma omp parallel for collapse(2)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
@@ -170,14 +167,11 @@ void project(int M, int N, int O, float *u, float *v, float *w, float *p, float 
         }
     }
 
-    // Apply boundary conditions for div and p
     set_bnd(M, N, O, 0, div);
     set_bnd(M, N, O, 0, p);
 
-    // Step 2: Solve the linear system
     lin_solve(M, N, O, 0, p, div, 1, 6);
 
-    // Step 3: Adjust velocity fields based on pressure
     #pragma omp parallel for collapse(2)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
@@ -189,7 +183,6 @@ void project(int M, int N, int O, float *u, float *v, float *w, float *p, float 
         }
     }
 
-    // Apply boundary conditions for u, v, and w
     set_bnd(M, N, O, 1, u);
     set_bnd(M, N, O, 2, v);
     set_bnd(M, N, O, 3, w);
