@@ -1,0 +1,36 @@
+g++ -Wall -fopenmp -O3 -march=native -flto -funroll-loops -fprefetch-loop-arrays main.cpp fluid_solver.cpp EventManager.cpp -o fluid_sim
+Running with 2 threads
+Total density after 100 timesteps: 140876
+
+real	0m17.288s
+user	0m31.076s
+sys	0m0.048s
+
+Running with 4 threads
+Total density after 100 timesteps: 140876
+
+real	0m12.872s
+user	0m40.513s
+sys	0m0.092s
+
+Running with 8 threads
+Total density after 100 timesteps: 140876
+
+real	0m9.535s
+user	0m52.923s
+sys	0m0.104s
+
+Running with 16 threads
+Total density after 100 timesteps: 140876
+
+real	0m9.727s
+user	1m25.758s
+sys	0m0.219s
+
+Running with 20 threads
+Total density after 100 timesteps: 140876
+
+real	0m9.611s
+user	1m42.688s
+sys	0m0.157s
+
