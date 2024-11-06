@@ -154,37 +154,45 @@ void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
 
 // Projection step to ensure incompressibility (make the velocity field
 // divergence-free)
-void project(int M, int N, int O, float *u, float *v, float *w, float *p,
-             float *div) {
-  for (int i = 1; i <= M; i++) {
-    for (int j = 1; j <= N; j++) {
-      for (int k = 1; k <= O; k++) {
-        div[IX(i, j, k)] =
-            -0.5f *
-            (u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] + v[IX(i, j + 1, k)] -
-             v[IX(i, j - 1, k)] + w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) /
-            MAX(M, MAX(N, O));
-        p[IX(i, j, k)] = 0;
-      }
+void project(int M, int N, int O, float *u, float *v, float *w, float *p, float *div) {
+    // Step 1: Compute divergence and initialize pressure
+    #pragma omp parallel for collapse(2)
+    for (int i = 1; i <= M; i++) {
+        for (int j = 1; j <= N; j++) {
+            for (int k = 1; k <= O; k++) {
+                div[IX(i, j, k)] = 
+                    -0.5f * (u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] +
+                             v[IX(i, j + 1, k)] - v[IX(i, j - 1, k)] +
+                             w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) / 
+                    MAX(M, MAX(N, O));
+                p[IX(i, j, k)] = 0;
+            }
+        }
     }
-  }
 
-  set_bnd(M, N, O, 0, div);
-  set_bnd(M, N, O, 0, p);
-  lin_solve(M, N, O, 0, p, div, 1, 6);
+    // Apply boundary conditions for div and p
+    set_bnd(M, N, O, 0, div);
+    set_bnd(M, N, O, 0, p);
 
-  for (int i = 1; i <= M; i++) {
-    for (int j = 1; j <= N; j++) {
-      for (int k = 1; k <= O; k++) {
-        u[IX(i, j, k)] -= 0.5f * (p[IX(i + 1, j, k)] - p[IX(i - 1, j, k)]);
-        v[IX(i, j, k)] -= 0.5f * (p[IX(i, j + 1, k)] - p[IX(i, j - 1, k)]);
-        w[IX(i, j, k)] -= 0.5f * (p[IX(i, j, k + 1)] - p[IX(i, j, k - 1)]);
-      }
+    // Step 2: Solve the linear system
+    lin_solve(M, N, O, 0, p, div, 1, 6);
+
+    // Step 3: Adjust velocity fields based on pressure
+    #pragma omp parallel for collapse(2)
+    for (int i = 1; i <= M; i++) {
+        for (int j = 1; j <= N; j++) {
+            for (int k = 1; k <= O; k++) {
+                u[IX(i, j, k)] -= 0.5f * (p[IX(i + 1, j, k)] - p[IX(i - 1, j, k)]);
+                v[IX(i, j, k)] -= 0.5f * (p[IX(i, j + 1, k)] - p[IX(i, j - 1, k)]);
+                w[IX(i, j, k)] -= 0.5f * (p[IX(i, j, k + 1)] - p[IX(i, j, k - 1)]);
+            }
+        }
     }
-  }
-  set_bnd(M, N, O, 1, u);
-  set_bnd(M, N, O, 2, v);
-  set_bnd(M, N, O, 3, w);
+
+    // Apply boundary conditions for u, v, and w
+    set_bnd(M, N, O, 1, u);
+    set_bnd(M, N, O, 2, v);
+    set_bnd(M, N, O, 3, w);
 }
 
 // Step function for density

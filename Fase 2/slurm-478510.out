@@ -2,35 +2,35 @@ g++ -Wall -fopenmp -O3 -march=native -flto -funroll-loops -fprefetch-loop-arrays
 Running with 2 threads
 Total density after 100 timesteps: 140876
 
-real	0m28.114s
-user	0m44.491s
-sys	0m0.076s
+real	0m16.276s
+user	0m32.350s
+sys	0m0.043s
 
 Running with 4 threads
 Total density after 100 timesteps: 140876
 
-real	0m22.594s
-user	0m59.085s
-sys	0m0.124s
+real	0m9.812s
+user	0m38.358s
+sys	0m0.055s
 
 Running with 8 threads
 Total density after 100 timesteps: 140876
 
-real	0m18.470s
-user	1m16.056s
-sys	0m0.137s
+real	0m6.870s
+user	0m53.293s
+sys	0m0.091s
 
 Running with 16 threads
 Total density after 100 timesteps: 140876
 
-real	0m18.392s
-user	1m56.099s
-sys	0m0.171s
+real	0m5.388s
+user	1m24.258s
+sys	0m0.122s
 
 Running with 20 threads
 Total density after 100 timesteps: 140876
 
-real	0m18.691s
-user	2m14.464s
-sys	0m0.184s
+real	0m5.397s
+user	1m45.750s
+sys	0m0.216s
 
