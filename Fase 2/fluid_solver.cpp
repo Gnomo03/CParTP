@@ -54,7 +54,6 @@ void set_bnd(int M, int N, int O, int b, float *x) {
 }
 
 // Linear solve for implicit methods (diffusion)
-
 // red-black solver with convergence check
 void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
     float tol = 1e-7, max_c, old_x, change;
@@ -62,6 +61,8 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
 
     do {
         max_c = 0.0f;
+        // Red phase
+        #pragma omp parallel for schedule(static) reduction(max:max_c) private(old_x, change)
         for (int k = 1; k <= O; k++) {
             for (int j = 1; j <= N; j++) {
                 for (int i = 1 + (j + k) % 2; i <= M; i += 2) {
@@ -76,6 +77,8 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
             }
         }
 
+        // Black phase
+        #pragma omp parallel for schedule(static) reduction(max:max_c) private(old_x, change)
         for (int k = 1; k <= O; k++) {
             for (int j = 1; j <= N; j++) {
                 for (int i = 1 + (j + k + 1) % 2; i <= M; i += 2) {
@@ -89,7 +92,9 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
                 }
             }
         }
+
         set_bnd(M, N, O, b, x);
+
     } while (max_c > tol && ++l < 20);
 }
 

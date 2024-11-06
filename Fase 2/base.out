@@ -1,0 +1,6 @@
+g++ -Wall -fopenmp -O3 -march=native -flto -funroll-loops -fprefetch-loop-arrays main.cpp fluid_solver.cpp EventManager.cpp -o fluid_sim
+Total density after 100 timesteps: 140876
+
+real	0m25.912s
+user	0m25.891s
+sys	0m0.021s
