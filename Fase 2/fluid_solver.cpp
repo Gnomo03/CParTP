@@ -109,7 +109,7 @@ void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
             float *w, float dt) {
   float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
 
-  #pragma omp parallel for collapse(2)  // Parallelize over i and j
+  #pragma omp parallel for collapse(3)
   for (int i = 1; i <= M; i++) {
     for (int j = 1; j <= N; j++) {
       for (int k = 1; k <= O; k++) {
@@ -153,7 +153,7 @@ void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
 // Projection step to ensure incompressibility (make the velocity field
 // divergence-free)
 void project(int M, int N, int O, float *u, float *v, float *w, float *p, float *div) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(3)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
             for (int k = 1; k <= O; k++) {
@@ -172,7 +172,7 @@ void project(int M, int N, int O, float *u, float *v, float *w, float *p, float 
 
     lin_solve(M, N, O, 0, p, div, 1, 6);
 
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(3)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
             for (int k = 1; k <= O; k++) {
