@@ -1,4 +1,4 @@
-CPP = g++ -Wall -fopenmp -O3 -march=native -flto -funroll-loops -fprefetch-loop-arrays
+CPP = g++ -Wall -fopenmp -Ofast -march=native -flto -funroll-loops -fprefetch-loop-arrays -ffast-math
 SRCS1 = main.cpp fluid_solver.cpp EventManager.cpp
 all: phase2
 phase2:

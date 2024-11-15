@@ -1,0 +1,88 @@
+Cleaning up...
+rm: cannot remove ‘fluid_sim’: No such file or directory
+make: *** [clean] Error 1
+g++ -Wall -fopenmp -Ofast -march=native -flto -funroll-loops -fprefetch-loop-arrays -ffast-math main.cpp fluid_solver.cpp EventManager.cpp -o fluid_sim
+Running with 1 threads
+Total density after 100 timesteps: 140881
+
+real	0m14.869s
+user	0m14.842s
+sys	0m0.026s
+
+Running with 2 threads
+Total density after 100 timesteps: 140881
+
+real	0m9.207s
+user	0m18.321s
+sys	0m0.048s
+
+Running with 4 threads
+Total density after 100 timesteps: 140881
+
+real	0m5.333s
+user	0m21.233s
+sys	0m0.041s
+
+Running with 8 threads
+Total density after 100 timesteps: 140881
+
+real	0m3.849s
+user	0m30.599s
+sys	0m0.057s
+
+Running with 12 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.131s
+user	0m49.304s
+sys	0m0.071s
+
+Running with 16 threads
+Total density after 100 timesteps: 140881
+
+real	0m3.900s
+user	1m1.964s
+sys	0m0.080s
+
+Running with 20 threads
+Total density after 100 timesteps: 140881
+
+real	0m3.387s
+user	1m6.954s
+sys	0m0.146s
+
+Running with 24 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.646s
+user	1m50.782s
+sys	0m0.181s
+
+Running with 28 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.607s
+user	2m8.295s
+sys	0m0.192s
+
+Running with 32 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.074s
+user	2m9.631s
+sys	0m0.158s
+
+Running with 36 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.886s
+user	2m54.877s
+sys	0m0.296s
+
+Running with 40 threads
+Total density after 100 timesteps: 140881
+
+real	0m4.539s
+user	3m0.552s
+sys	0m0.218s
+

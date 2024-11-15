@@ -2,11 +2,10 @@
 #include <cmath>
 #include <algorithm>
 
-
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 #define SWAP(x0, x)                                                            \
   {                                                                            \
-    float *tmp = x0;                                                           \
+    float * tmp = x0;                                            \
     x0 = x;                                                                    \
     x = tmp;                                                                   \
   }
@@ -14,7 +13,7 @@
 #define LINEARSOLVERTIMES 20
 
 // Add sources (density or velocity)
-void add_source(int M, int N, int O, float *x, float *s, float dt) {
+void add_source(int M, int N, int O, float * x, float * s, float dt) {
   int size = (M + 2) * (N + 2) * (O + 2);
   for (int i = 0; i < size; i++) {
     x[i] += dt * s[i];
@@ -22,7 +21,7 @@ void add_source(int M, int N, int O, float *x, float *s, float dt) {
 }
 
 // Set boundary conditions
-void set_bnd(int M, int N, int O, int b, float *x) {
+void set_bnd(int M, int N, int O, int b, float * x) {
   int i, j;
 
   // Set boundary on faces
@@ -56,10 +55,10 @@ void set_bnd(int M, int N, int O, int b, float *x) {
 }
 
 // Linear solve for implicit methods (diffusion)
-// red-black solver with convergence check
-void lin_solve(int M, int N, int O, int b, float *__restrict__ x, float *__restrict__ x0, float a, float c) {
+void lin_solve(int M, int N, int O, int b, float * __restrict__ x, float * __restrict__ x0, float a, float c) {
     float tol = 1e-7, max_c, old_x, change;
     int l = 0;
+    const float inv_c = 1.0f / c;
 
     do {
         max_c = 0.0f;
@@ -71,7 +70,7 @@ void lin_solve(int M, int N, int O, int b, float *__restrict__ x, float *__restr
                     x[IX(i, j, k)] = (x0[IX(i, j, k)] +
                                       a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
+                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * inv_c;
                     change = fabs(x[IX(i, j, k)] - old_x);
                     max_c = MAX(max_c, change);
                 }
@@ -86,7 +85,7 @@ void lin_solve(int M, int N, int O, int b, float *__restrict__ x, float *__restr
                     x[IX(i, j, k)] = (x0[IX(i, j, k)] +
                                       a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
+                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) * inv_c;
                     change = fabs(x[IX(i, j, k)] - old_x);
                     max_c = MAX(max_c, change);
                 }
@@ -98,44 +97,33 @@ void lin_solve(int M, int N, int O, int b, float *__restrict__ x, float *__restr
     } while (max_c > tol && ++l < 20);
 }
 
-// Diffusion step (uses implicit method)
-void diffuse(int M, int N, int O, int b, float *__restrict__ x, float *__restrict__ x0, float diff,
+// Diffusion step
+void diffuse(int M, int N, int O, int b, float * x, float * x0, float diff,
              float dt) {
   int max = MAX(MAX(M, N), O);
   float a = dt * diff * max * max;
   lin_solve(M, N, O, b, x, x0, a, 1 + 6 * a);
 }
 
-// Advection step (uses velocity field to move quantities)
-void advect(int M, int N, int O, int b, float *__restrict__ d, float *__restrict__ d0, __restrict__ float *u, __restrict__ float *v,
-            __restrict__ float *w, float dt) {
+// Advection step
+void advect(int M, int N, int O, int b, float * d, float *  d0, 
+           float *  u, float *  v, float *  w, float dt) {
   float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
-
-  #pragma omp parallel for collapse(2)
-  for (int i = 1; i <= M; i++) {
+#pragma omp parallel for collapse(3)
+  for (int k = 1; k <= O; k++) {
     for (int j = 1; j <= N; j++) {
-      for (int k = 1; k <= O; k++) {
+      for (int i = 1; i <= M; i++) {
         float x = i - dtX * u[IX(i, j, k)];
         float y = j - dtY * v[IX(i, j, k)];
         float z = k - dtZ * w[IX(i, j, k)];
 
-        // Clamp to grid boundaries
-        if (x < 0.5f)
-          x = 0.5f;
-        if (x > M + 0.5f)
-          x = M + 0.5f;
-        if (y < 0.5f)
-          y = 0.5f;
-        if (y > N + 0.5f)
-          y = N + 0.5f;
-        if (z < 0.5f)
-          z = 0.5f;
-        if (z > O + 0.5f)
-          z = O + 0.5f;
+        std::clamp(x, 0.5f, M + 0.5f);
+        std::clamp(y, 0.5f, N + 0.5f);
+        std::clamp(z, 0.5f, O + 0.5f);
 
-        int i0 = (int)x, i1 = i0 + 1;
-        int j0 = (int)y, j1 = j0 + 1;
-        int k0 = (int)z, k1 = k0 + 1;
+        int i0 = static_cast<int>(x), i1 = i0 + 1;
+        int j0 = static_cast<int>(y), j1 = j0 + 1;
+        int k0 = static_cast<int>(z), k1 = k0 + 1;
 
         float s1 = x - i0, s0 = 1 - s1;
         float t1 = y - j0, t0 = 1 - t1;
@@ -152,8 +140,9 @@ void advect(int M, int N, int O, int b, float *__restrict__ d, float *__restrict
   set_bnd(M, N, O, b, d);
 }
 
-// Projection step to ensure incompressibility (make the velocity field divergence-free)
-void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+// Projection step
+void project(int M, int N, int O, float *  u, float *  v, 
+            float *  w, float *  p, float *  div) {
     #pragma omp parallel for collapse(2)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
@@ -189,9 +178,10 @@ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, 
     set_bnd(M, N, O, 3, w);
 }
 
-// Step function for density
-void dens_step(int M, int N, int O, float *x, float *x0, float *u, float *v,
-               float *w, float diff, float dt) {
+// Density step function
+void dens_step(int M, int N, int O, float * x, float * x0, 
+              float *  u, float *  v, float *  w, 
+              float diff, float dt) {
   add_source(M, N, O, x, x0, dt);
   SWAP(x0, x);
   diffuse(M, N, O, 0, x, x0, diff, dt);
@@ -199,9 +189,10 @@ void dens_step(int M, int N, int O, float *x, float *x0, float *u, float *v,
   advect(M, N, O, 0, x, x0, u, v, w, dt);
 }
 
-// Step function for velocity
-void vel_step(int M, int N, int O, float *u, float *v, float *w, float *u0,
-              float *v0, float *w0, float visc, float dt) {
+// Velocity step function
+void vel_step(int M, int N, int O, float *  u, float *  v, 
+             float *  w, float *  u0, float *  v0, 
+             float *  w0, float visc, float dt) {
   add_source(M, N, O, u, u0, dt);
   add_source(M, N, O, v, v0, dt);
   add_source(M, N, O, w, w0, dt);
