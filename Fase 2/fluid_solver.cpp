@@ -1,5 +1,7 @@
 #include "fluid_solver.h"
 #include <cmath>
+#include <algorithm>
+
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 #define SWAP(x0, x)                                                            \
@@ -55,7 +57,7 @@ void set_bnd(int M, int N, int O, int b, float *x) {
 
 // Linear solve for implicit methods (diffusion)
 // red-black solver with convergence check
-void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
+void lin_solve(int M, int N, int O, int b, float *__restrict__ x, float *__restrict__ x0, float a, float c) {
     float tol = 1e-7, max_c, old_x, change;
     int l = 0;
 
@@ -69,9 +71,9 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
                     x[IX(i, j, k)] = (x0[IX(i, j, k)] +
                                       a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /c;
+                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
                     change = fabs(x[IX(i, j, k)] - old_x);
-                    if(change > max_c) max_c = change;
+                    max_c = MAX(max_c, change);
                 }
             }
         }
@@ -86,7 +88,7 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
                                            x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
                                            x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) / c;
                     change = fabs(x[IX(i, j, k)] - old_x);
-                    if(change > max_c) max_c = change;
+                    max_c = MAX(max_c, change);
                 }
             }
         }
@@ -97,7 +99,7 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
 }
 
 // Diffusion step (uses implicit method)
-void diffuse(int M, int N, int O, int b, float *x, float *x0, float diff,
+void diffuse(int M, int N, int O, int b, float *__restrict__ x, float *__restrict__ x0, float diff,
              float dt) {
   int max = MAX(MAX(M, N), O);
   float a = dt * diff * max * max;
@@ -105,11 +107,11 @@ void diffuse(int M, int N, int O, int b, float *x, float *x0, float diff,
 }
 
 // Advection step (uses velocity field to move quantities)
-void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
-            float *w, float dt) {
+void advect(int M, int N, int O, int b, float *__restrict__ d, float *__restrict__ d0, __restrict__ float *u, __restrict__ float *v,
+            __restrict__ float *w, float dt) {
   float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
 
-  #pragma omp parallel for collapse(3)
+  #pragma omp parallel for collapse(2)
   for (int i = 1; i <= M; i++) {
     for (int j = 1; j <= N; j++) {
       for (int k = 1; k <= O; k++) {
@@ -150,10 +152,9 @@ void advect(int M, int N, int O, int b, float *d, float *d0, float *u, float *v,
   set_bnd(M, N, O, b, d);
 }
 
-// Projection step to ensure incompressibility (make the velocity field
-// divergence-free)
-void project(int M, int N, int O, float *u, float *v, float *w, float *p, float *div) {
-    #pragma omp parallel for collapse(3)
+// Projection step to ensure incompressibility (make the velocity field divergence-free)
+void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+    #pragma omp parallel for collapse(2)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
             for (int k = 1; k <= O; k++) {
@@ -172,7 +173,7 @@ void project(int M, int N, int O, float *u, float *v, float *w, float *p, float 
 
     lin_solve(M, N, O, 0, p, div, 1, 6);
 
-    #pragma omp parallel for collapse(3)
+    #pragma omp parallel for collapse(2)
     for (int i = 1; i <= M; i++) {
         for (int j = 1; j <= N; j++) {
             for (int k = 1; k <= O; k++) {

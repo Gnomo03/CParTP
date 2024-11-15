@@ -1,0 +1,181 @@
+/var/spool/slurmd/job489746/slurm_script: line 7: module: command not found
+g++ -Wall -fopenmp -O3 -march=native -flto -funroll-loops -fprefetch-loop-arrays main.cpp fluid_solver.cpp EventManager.cpp -o fluid_sim
+In file included from main.cpp:1:0:
+EventManager.h: In constructor ‘Event::Event(int, int, int, int)’:
+EventManager.h:27:33: warning: extended initializer lists only available with -std=c++11 or -std=gnu++11 [enabled by default]
+       : type(APPLY_FORCE), force({fx, fy, fz}), timestep(ts) {}
+                                 ^
+EventManager.h:27:60: warning: extended initializer lists only available with -std=c++11 or -std=gnu++11 [enabled by default]
+       : type(APPLY_FORCE), force({fx, fy, fz}), timestep(ts) {}
+                                                            ^
+main.cpp: In function ‘void apply_events(const std::vector<Event>&)’:
+main.cpp:64:14: warning: ‘auto’ changes meaning in C++11; please remove it [-Wc++0x-compat]
+   for (const auto &event : events) {
+              ^
+main.cpp:64:20: error: ISO C++ forbids declaration of ‘event’ with no type [-fpermissive]
+   for (const auto &event : events) {
+                    ^
+main.cpp:64:28: error: range-based ‘for’ loops are not allowed in C++98 mode
+   for (const auto &event : events) {
+                            ^
+main.cpp:65:15: error: request for member ‘type’ in ‘event’, which is of non-class type ‘const int’
+     if (event.type == ADD_SOURCE) {
+               ^
+main.cpp:68:33: error: request for member ‘density’ in ‘event’, which is of non-class type ‘const int’
+       dens[IX(i, j, k)] = event.density;
+                                 ^
+main.cpp:69:22: error: request for member ‘type’ in ‘event’, which is of non-class type ‘const int’
+     } else if (event.type == APPLY_FORCE) {
+                      ^
+main.cpp:72:30: error: request for member ‘force’ in ‘event’, which is of non-class type ‘const int’
+       u[IX(i, j, k)] = event.force.x;
+                              ^
+main.cpp:73:30: error: request for member ‘force’ in ‘event’, which is of non-class type ‘const int’
+       v[IX(i, j, k)] = event.force.y;
+                              ^
+main.cpp:74:30: error: request for member ‘force’ in ‘event’, which is of non-class type ‘const int’
+       w[IX(i, j, k)] = event.force.z;
+                              ^
+fluid_solver.cpp:110:108: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void advect(int M, int N, int O, int b, float *__restrict__ d, float *__restrict__ d0, __restrict__ float *u, __restrict__ float *v,
+                                                                                                            ^
+fluid_solver.cpp:110:131: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void advect(int M, int N, int O, int b, float *__restrict__ d, float *__restrict__ d0, __restrict__ float *u, __restrict__ float *v,
+                                                                                                                                   ^
+fluid_solver.cpp:111:33: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+             __restrict__ float *w, float dt) {
+                                 ^
+fluid_solver.cpp: In function ‘void advect(int, int, int, int, float*, float*, float*, float*, float*, float)’:
+fluid_solver.cpp:117:15: warning: ‘auto’ changes meaning in C++11; please remove it [-Wc++0x-compat]
+         const auto index = IX(i, j, k);
+               ^
+fluid_solver.cpp:117:20: error: ‘index’ does not name a type
+         const auto index = IX(i, j, k);
+                    ^
+fluid_solver.cpp:118:31: error: ‘index’ was not declared in this scope
+         float x = i - dtX * u[index];
+                               ^
+fluid_solver.cpp:122:9: error: ‘clamp’ is not a member of ‘std’
+         std::clamp(x, 0.5f, M + 0.5f);
+         ^
+fluid_solver.cpp:123:9: error: ‘clamp’ is not a member of ‘std’
+         std::clamp(y, 0.5f, N + 0.5f);
+         ^
+fluid_solver.cpp:124:9: error: ‘clamp’ is not a member of ‘std’
+         std::clamp(z, 0.5f, O + 0.5f);
+         ^
+fluid_solver.cpp: At global scope:
+fluid_solver.cpp:146:55: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+                                                       ^
+fluid_solver.cpp:146:78: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+                                                                              ^
+fluid_solver.cpp:146:101: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+                                                                                                     ^
+fluid_solver.cpp:146:124: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+                                                                                                                            ^
+fluid_solver.cpp:146:147: error: ‘__restrict__’ qualifiers cannot be applied to ‘float’
+ void project(int M, int N, int O, __restrict__ float *u, __restrict__ float *v, __restrict__ float *w, __restrict__ float *p, __restrict__ float *div) {
+                                                                                                                                                   ^
+In file included from EventManager.cpp:1:0:
+EventManager.h: In constructor ‘Event::Event(int, int, int, int)’:
+EventManager.h:27:33: warning: extended initializer lists only available with -std=c++11 or -std=gnu++11 [enabled by default]
+       : type(APPLY_FORCE), force({fx, fy, fz}), timestep(ts) {}
+                                 ^
+EventManager.h:27:60: warning: extended initializer lists only available with -std=c++11 or -std=gnu++11 [enabled by default]
+       : type(APPLY_FORCE), force({fx, fy, fz}), timestep(ts) {}
+                                                            ^
+EventManager.cpp: In member function ‘void EventManager::read_events(const string&)’:
+EventManager.cpp:8:30: error: no matching function for call to ‘std::basic_ifstream<char>::basic_ifstream(const string&)’
+   std::ifstream file(filename);
+                              ^
+EventManager.cpp:8:30: note: candidates are:
+In file included from EventManager.cpp:2:0:
+/usr/include/c++/4.8.2/fstream:467:7: note: std::basic_ifstream<_CharT, _Traits>::basic_ifstream(const char*, std::ios_base::openmode) [with _CharT = char; _Traits = std::char_traits<char>; std::ios_base::openmode = std::_Ios_Openmode]
+       basic_ifstream(const char* __s, ios_base::openmode __mode = ios_base::in)
+       ^
+/usr/include/c++/4.8.2/fstream:467:7: note:   no known conversion for argument 1 from ‘const string {aka const std::basic_string<char>}’ to ‘const char*’
+/usr/include/c++/4.8.2/fstream:453:7: note: std::basic_ifstream<_CharT, _Traits>::basic_ifstream() [with _CharT = char; _Traits = std::char_traits<char>]
+       basic_ifstream() : __istream_type(), _M_filebuf()
+       ^
+/usr/include/c++/4.8.2/fstream:453:7: note:   candidate expects 0 arguments, 1 provided
+/usr/include/c++/4.8.2/fstream:427:11: note: std::basic_ifstream<char>::basic_ifstream(const std::basic_ifstream<char>&)
+     class basic_ifstream : public basic_istream<_CharT, _Traits>
+           ^
+/usr/include/c++/4.8.2/fstream:427:11: note:   no known conversion for argument 1 from ‘const string {aka const std::basic_string<char>}’ to ‘const std::basic_ifstream<char>&’
+EventManager.cpp:32:14: error: ‘class std::vector<Event>’ has no member named ‘emplace_back’
+       events.emplace_back(density, timestep);
+              ^
+EventManager.cpp:36:14: error: ‘class std::vector<Event>’ has no member named ‘emplace_back’
+       events.emplace_back(x, y, z, timestep);
+              ^
+EventManager.cpp: In member function ‘std::vector<Event> EventManager::get_events_at_timestamp(int) const’:
+EventManager.cpp:48:14: warning: ‘auto’ changes meaning in C++11; please remove it [-Wc++0x-compat]
+   for (const auto &event : events) {
+              ^
+EventManager.cpp:48:20: error: ISO C++ forbids declaration of ‘event’ with no type [-fpermissive]
+   for (const auto &event : events) {
+                    ^
+EventManager.cpp:48:28: error: range-based ‘for’ loops are not allowed in C++98 mode
+   for (const auto &event : events) {
+                            ^
+EventManager.cpp:49:15: error: request for member ‘timestep’ in ‘event’, which is of non-class type ‘const int’
+     if (event.timestep == timestamp) {
+               ^
+EventManager.cpp:50:29: error: no matching function for call to ‘std::vector<Event>::push_back(const int&)’
+       result.push_back(event);
+                             ^
+EventManager.cpp:50:29: note: candidate is:
+In file included from /usr/include/c++/4.8.2/vector:64:0,
+                 from EventManager.h:5,
+                 from EventManager.cpp:1:
+/usr/include/c++/4.8.2/bits/stl_vector.h:901:7: note: void std::vector<_Tp, _Alloc>::push_back(const value_type&) [with _Tp = Event; _Alloc = std::allocator<Event>; std::vector<_Tp, _Alloc>::value_type = Event]
+       push_back(const value_type& __x)
+       ^
+/usr/include/c++/4.8.2/bits/stl_vector.h:901:7: note:   no known conversion for argument 1 from ‘const int’ to ‘const value_type& {aka const Event&}’
+make: *** [phase2] Error 1
+Running with 1 threads
+Total density after 100 timesteps: 140876
+
+real	0m25.509s
+user	0m25.477s
+sys	0m0.032s
+
+Running with 2 threads
+Total density after 100 timesteps: 140876
+
+real	1m14.438s
+user	0m28.654s
+sys	0m0.037s
+
+Running with 4 threads
+Total density after 100 timesteps: 140876
+
+real	0m9.110s
+user	0m35.717s
+sys	0m0.043s
+
+Running with 8 threads
+Total density after 100 timesteps: 140876
+
+real	0m6.728s
+user	0m52.748s
+sys	0m0.067s
+
+Running with 16 threads
+Total density after 100 timesteps: 140876
+
+real	1m5.170s
+user	1m21.242s
+sys	0m0.113s
+
+Running with 20 threads
+Total density after 100 timesteps: 140876
+
+real	0m4.487s
+user	1m28.604s
+sys	0m0.084s
+
